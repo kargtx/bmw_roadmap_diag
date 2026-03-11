@@ -4,6 +4,7 @@ let currentItemForHelp = null;
 let currentTheme = 'light';
 let syncInterval = null;
 let lastScrollTop = 0;
+let isAtTop = true;
 
 // Инициализация при загрузке
 document.addEventListener('DOMContentLoaded', async () => {
@@ -23,22 +24,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Запускаем синхронизацию
     startSync();
     
-    // Отслеживаем скролл для верхней панели
+    // Отслеживаем скролл
     setupScrollHandler();
 });
 
 // Настройка обработчика скролла
 function setupScrollHandler() {
     const topBar = document.getElementById('topBar');
+    const progressContainer = document.getElementById('progressContainer');
     
     window.addEventListener('scroll', () => {
         const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
         
+        // Проверяем, находится ли пользователь вверху страницы
+        isAtTop = scrollTop < 50;
+        
+        // Показываем/скрываем прогресс-бар
+        if (isAtTop) {
+            progressContainer.classList.remove('hidden');
+        } else {
+            progressContainer.classList.add('hidden');
+        }
+        
+        // Скрываем верхнюю панель при скролле вниз
         if (scrollTop > lastScrollTop && scrollTop > 60) {
-            // Скролл вниз - прячем панель
             topBar.classList.add('hidden');
         } else {
-            // Скролл вверх - показываем панель
             topBar.classList.remove('hidden');
         }
         
@@ -66,17 +77,6 @@ function startSync() {
             }
         }
     });
-    
-    // Периодическая проверка
-    syncInterval = setInterval(checkForUpdates, 5000);
-}
-
-// Проверка обновлений
-function checkForUpdates() {
-    const lastUpdate = localStorage.getItem('lastXMLUpdate');
-    if (lastUpdate) {
-        updateLastSyncTime();
-    }
 }
 
 // Показать индикатор синхронизации
@@ -103,12 +103,12 @@ function updateLastSyncTime() {
     }
 }
 
-// Восстановление из бэкапа
-async function restoreFromBackup() {
-    if (confirm('Восстановить все справки из бэкапа? Все текущие изменения будут потеряны.')) {
-        showSyncIndicator('🔄 Восстановление...');
+// Восстановление из файла бэкапа
+async function restoreFromBackupFile() {
+    if (confirm('Восстановить все справки из файла бэкапа? Все текущие изменения будут потеряны.')) {
+        showSyncIndicator('🔄 Восстановление из бэкапа...');
         
-        const backupItems = restoreFromBackup();
+        const backupItems = await restoreFromBackupFile();
         if (backupItems) {
             items = backupItems;
             saveXMLToStorage(items);
@@ -117,7 +117,7 @@ async function restoreFromBackup() {
         
         setTimeout(() => {
             hideSyncIndicator();
-            alert('Справки восстановлены из бэкапа!');
+            alert('Справки восстановлены из файла бэкапа!');
         }, 1000);
     }
 }
@@ -164,12 +164,18 @@ function showHelp(id) {
     document.getElementById('helpModalTitle').textContent = item.title || `Пункт ${id}`;
     document.getElementById('modalHelpContent').textContent = item.help || 'Нет справки для этого пункта';
     document.getElementById('helpModal').classList.add('active');
+    
+    // Блокируем скролл body
+    document.body.style.overflow = 'hidden';
 }
 
 // Закрыть справку
 function closeHelpModal() {
     document.getElementById('helpModal').classList.remove('active');
     currentItemForHelp = null;
+    
+    // Возвращаем скролл body
+    document.body.style.overflow = '';
 }
 
 // Переключение чекбокса
@@ -194,6 +200,7 @@ function updateStats() {
     document.getElementById('completedCount').textContent = completed;
     document.getElementById('totalCount').textContent = total;
     document.getElementById('progressFill').style.width = percent + '%';
+    document.getElementById('progressPercent').textContent = percent;
 }
 
 // Добавление нового пункта
@@ -231,11 +238,17 @@ function editCurrentHelp() {
     document.getElementById('editTitle').value = item.title || '';
     document.getElementById('editHelp').value = item.help || '';
     document.getElementById('editModal').classList.add('active');
+    
+    // Блокируем скролл body
+    document.body.style.overflow = 'hidden';
 }
 
 // Закрыть редактирование
 function closeEditModal() {
     document.getElementById('editModal').classList.remove('active');
+    
+    // Возвращаем скролл body
+    document.body.style.overflow = '';
 }
 
 // Сохранение изменений
@@ -294,8 +307,8 @@ function clearAllChecks() {
     setTimeout(() => hideSyncIndicator(), 1000);
 }
 
-// Отправка результатов
-function submitResults() {
+// Окончить проверку
+function finishInspection() {
     const completed = items.filter(i => i.checked).length;
     const total = items.length;
     const notCompleted = items.filter(i => !i.checked);
@@ -308,7 +321,7 @@ function submitResults() {
             message += `• ${item.title}\n`;
         });
     } else {
-        message += '🎉 Все пункты отмечены!';
+        message += '🎉 Все пункты отмечены! Проверка завершена.';
     }
     
     alert(message);
@@ -348,32 +361,3 @@ window.addEventListener('beforeunload', () => {
         clearInterval(syncInterval);
     }
 });
-
-// Обработка свайпов для модалок
-let touchStartY = 0;
-
-const helpModal = document.getElementById('helpModal');
-if (helpModal) {
-    helpModal.addEventListener('touchstart', (e) => {
-        touchStartY = e.touches[0].clientY;
-    });
-
-    helpModal.addEventListener('touchmove', (e) => {
-        if (touchStartY > e.touches[0].clientY + 50) {
-            closeHelpModal();
-        }
-    });
-}
-
-const editModal = document.getElementById('editModal');
-if (editModal) {
-    editModal.addEventListener('touchstart', (e) => {
-        touchStartY = e.touches[0].clientY;
-    });
-
-    editModal.addEventListener('touchmove', (e) => {
-        if (touchStartY > e.touches[0].clientY + 50) {
-            closeEditModal();
-        }
-    });
-}

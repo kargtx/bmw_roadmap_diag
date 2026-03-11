@@ -1,7 +1,5 @@
 // Парсер для XML файлов
 const XML_VERSION = '1.0.0';
-const XML_FILE_NAME = 'help_texts.xml';
-const XML_BACKUP_NAME = 'help_backup.xml';
 
 // Парсинг XML строки в объекты
 function parseXMLToItems(xmlString) {
@@ -64,7 +62,7 @@ function escapeXML(text) {
 // Загрузка XML файла
 async function loadXMLFromFile() {
     try {
-        // Пробуем загрузить из localStorage сначала
+        // Пробуем загрузить из localStorage
         const savedXML = localStorage.getItem('dieselCheckXML');
         if (savedXML) {
             const parsed = parseXMLToItems(savedXML);
@@ -84,12 +82,7 @@ function saveXMLToStorage(items) {
     try {
         const xmlString = convertItemsToXML(items);
         localStorage.setItem('dieselCheckXML', xmlString);
-        localStorage.setItem('dieselCheckXMLVersion', XML_VERSION);
         localStorage.setItem('lastXMLUpdate', Date.now().toString());
-        
-        // Сохраняем также в отдельный ключ для обратной совместимости
-        localStorage.setItem('dieselCheckItems', JSON.stringify(items));
-        
         return true;
     } catch (error) {
         console.error('Ошибка сохранения XML:', error);
@@ -97,13 +90,14 @@ function saveXMLToStorage(items) {
     }
 }
 
-// Загрузка бэкапа
-async function loadBackupXML() {
+// Восстановление из файла бэкапа
+async function restoreFromBackupFile() {
     try {
+        // В реальном приложении здесь была бы загрузка из файла
+        // Для демонстрации используем сохраненный бэкап или начальные данные
         const backupXML = localStorage.getItem('dieselCheckXMLBackup');
         if (backupXML) {
-            const parsed = parseXMLToItems(backupXML);
-            if (parsed) return parsed;
+            return parseXMLToItems(backupXML);
         }
     } catch (error) {
         console.error('Ошибка загрузки бэкапа:', error);
@@ -115,16 +109,6 @@ async function loadBackupXML() {
 function createBackup(items) {
     const xmlString = convertItemsToXML(items);
     localStorage.setItem('dieselCheckXMLBackup', xmlString);
-    localStorage.setItem('backupTimestamp', Date.now().toString());
-}
-
-// Восстановление из бэкапа
-function restoreFromBackup() {
-    const backupXML = localStorage.getItem('dieselCheckXMLBackup');
-    if (backupXML) {
-        return parseXMLToItems(backupXML);
-    }
-    return getInitialXMLItems();
 }
 
 // Начальные XML данные
