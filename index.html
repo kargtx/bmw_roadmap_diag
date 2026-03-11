@@ -8,7 +8,7 @@
 </head>
 <body>
     <div class="container">
-        <!-- Шапка -->
+        <!-- Шапка (не закреплена) -->
         <div class="header">
             <h1>🚛 Дизель-Чек</h1>
             <button class="theme-toggle" onclick="toggleTheme()" id="themeToggle">🌙</button>
@@ -22,6 +22,14 @@
             <button class="action-btn" onclick="clearAllChecks()">
                 <span>🗑️</span> Снять все
             </button>
+            <button class="action-btn" onclick="restoreFromBackup()">
+                <span>🔄</span> Бэкап
+            </button>
+        </div>
+
+        <!-- Индикатор синхронизации -->
+        <div class="sync-indicator" id="syncIndicator">
+            <span id="syncStatus">🔄 Синхронизация...</span>
         </div>
 
         <!-- Статистика -->
@@ -52,13 +60,13 @@
         </div>
 
         <!-- Кнопка отправки результатов -->
-        <button class="action-btn" style="margin-top: 16px; background: var(--success); color: var(--bg-primary);" onclick="submitResults()">
+        <button class="action-btn submit-btn" onclick="submitResults()">
             ✅ ОТПРАВИТЬ РЕЗУЛЬТАТЫ
         </button>
 
         <!-- Подвал -->
         <div class="footer">
-            Все справки сохраняются автоматически
+            <span id="lastSyncTime"></span>
         </div>
     </div>
 

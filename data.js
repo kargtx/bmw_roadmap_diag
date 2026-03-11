@@ -1,4 +1,7 @@
 // Файл с данными - текстовые инструкции
+// Версия данных для синхронизации
+const DATA_VERSION = '1.0.0';
+
 const INITIAL_ITEMS = [
     { 
         id: 1, 
@@ -86,16 +89,59 @@ const INITIAL_ITEMS = [
     }
 ];
 
+// Бэкап данных (неизменяемая копия)
+const BACKUP_ITEMS = JSON.parse(JSON.stringify(INITIAL_ITEMS));
+
 // Функция для загрузки данных из localStorage
 function loadItemsFromStorage() {
-    const savedItems = localStorage.getItem('dieselCheckItems');
-    if (savedItems) {
-        return JSON.parse(savedItems);
+    try {
+        const savedData = localStorage.getItem('dieselCheckData');
+        if (savedData) {
+            const parsed = JSON.parse(savedData);
+            // Проверяем версию
+            if (parsed.version === DATA_VERSION && Array.isArray(parsed.items)) {
+                return parsed.items;
+            }
+        }
+    } catch (e) {
+        console.error('Ошибка загрузки данных:', e);
     }
-    return INITIAL_ITEMS;
+    return JSON.parse(JSON.stringify(INITIAL_ITEMS));
 }
 
-// Функция для сохранения данных в localStorage
+// Функция для сохранения данных в localStorage с версией
 function saveItemsToStorage(items) {
-    localStorage.setItem('dieselCheckItems', JSON.stringify(items));
+    try {
+        const dataToSave = {
+            version: DATA_VERSION,
+            timestamp: Date.now(),
+            items: items
+        };
+        localStorage.setItem('dieselCheckData', JSON.stringify(dataToSave));
+        
+        // Сохраняем также в отдельный ключ для обратной совместимости
+        localStorage.setItem('dieselCheckItems', JSON.stringify(items));
+        
+        // Обновляем время последней синхронизации
+        localStorage.setItem('lastSyncTime', Date.now().toString());
+        
+        return true;
+    } catch (e) {
+        console.error('Ошибка сохранения данных:', e);
+        return false;
+    }
+}
+
+// Функция для восстановления из бэкапа
+function restoreFromBackup() {
+    return JSON.parse(JSON.stringify(INITIAL_ITEMS));
+}
+
+// Функция для получения времени последней синхронизации
+function getLastSyncTime() {
+    const lastSync = localStorage.getItem('lastSyncTime');
+    if (lastSync) {
+        return new Date(parseInt(lastSync)).toLocaleString();
+    }
+    return 'никогда';
 }
