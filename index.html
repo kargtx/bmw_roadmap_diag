@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>Дизель-Чек</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Шапка -->
+        <div class="header">
+            <h1>🚛 Дизель-Чек</h1>
+            <button class="theme-toggle" onclick="toggleTheme()" id="themeToggle">🌙</button>
+        </div>
+
+        <!-- Кнопки действий -->
+        <div class="action-buttons">
+            <button class="action-btn" onclick="addNewItem()">
+                <span>➕</span> Добавить пункт
+            </button>
+            <button class="action-btn" onclick="clearAllChecks()">
+                <span>🗑️</span> Снять все
+            </button>
+        </div>
+
+        <!-- Статистика -->
+        <div class="stats-panel">
+            <div class="stats-row">
+                <span>Выполнено: <span id="completedCount">0</span>/<span id="totalCount">14</span></span>
+                <span id="progressPercent">0%</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- Список пунктов -->
+        <div class="items-list" id="itemsList"></div>
+
+        <!-- Панель справки -->
+        <div class="help-panel">
+            <div class="help-header">
+                <span class="help-title">📖 Справка по пункту</span>
+                <button class="edit-btn" onclick="editCurrentHelp()">
+                    <span>✏️</span> Ред.
+                </button>
+            </div>
+            <div class="help-content" id="helpContent">
+                Выберите пункт для просмотра справки
+            </div>
+        </div>
+
+        <!-- Кнопка отправки результатов -->
+        <button class="action-btn" style="margin-top: 16px; background: var(--success); color: var(--bg-primary);" onclick="submitResults()">
+            ✅ ОТПРАВИТЬ РЕЗУЛЬТАТЫ
+        </button>
+
+        <!-- Подвал -->
+        <div class="footer">
+            Все справки сохраняются автоматически
+        </div>
+    </div>
+
+    <!-- Модальное окно редактирования -->
+    <div class="modal" id="editModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">Редактирование пункта</h3>
+                <button class="modal-close" onclick="closeModal()">✖</button>
+            </div>
+            
+            <input type="text" class="modal-input" id="editTitle" placeholder="Название пункта">
+            <textarea class="modal-textarea" id="editHelp" placeholder="Текст справки..."></textarea>
+            
+            <div class="modal-buttons">
+                <button class="modal-btn primary" onclick="saveItem()">Сохранить</button>
+                <button class="modal-btn secondary" onclick="closeModal()">Отмена</button>
+            </div>
+            
+            <button class="modal-btn danger" style="margin-top: 12px;" onclick="deleteCurrentItem()" id="deleteBtn">
+                🗑️ Удалить пункт
+            </button>
+        </div>
+    </div>
+
+    <!-- Подключаем JavaScript -->
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
