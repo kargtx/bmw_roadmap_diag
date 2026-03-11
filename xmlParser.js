@@ -1,0 +1,148 @@
+// Парсер для XML файлов
+const XML_VERSION = '1.0.0';
+const XML_FILE_NAME = 'help_texts.xml';
+const XML_BACKUP_NAME = 'help_backup.xml';
+
+// Парсинг XML строки в объекты
+function parseXMLToItems(xmlString) {
+    try {
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xmlString, 'text/xml');
+        
+        const items = [];
+        const itemNodes = xmlDoc.getElementsByTagName('item');
+        
+        for (let node of itemNodes) {
+            const id = parseInt(node.getAttribute('id'));
+            const helpText = node.textContent || '';
+            
+            // Парсим заголовок из текста справки
+            let title = `Пункт ${id}`;
+            const firstLine = helpText.split('\n')[0];
+            if (firstLine.includes(':')) {
+                title = firstLine.split(':')[0].trim();
+            } else if (firstLine.length < 50) {
+                title = firstLine.substring(0, 30);
+            }
+            
+            items.push({
+                id: id,
+                title: title,
+                help: helpText,
+                checked: false
+            });
+        }
+        
+        return items.sort((a, b) => a.id - b.id);
+    } catch (error) {
+        console.error('Ошибка парсинга XML:', error);
+        return null;
+    }
+}
+
+// Конвертация items в XML строку
+function convertItemsToXML(items) {
+    let xml = '<?xml version=\'1.0\' encoding=\'utf-8\'?>\n<help_texts>\n';
+    
+    items.sort((a, b) => a.id - b.id).forEach(item => {
+        xml += `  <item id="${item.id}">${escapeXML(item.help || '')}</item>\n`;
+    });
+    
+    xml += '</help_texts>';
+    return xml;
+}
+
+// Экранирование специальных символов XML
+function escapeXML(text) {
+    return text.replace(/&/g, '&amp;')
+               .replace(/</g, '&lt;')
+               .replace(/>/g, '&gt;')
+               .replace(/"/g, '&quot;')
+               .replace(/'/g, '&apos;');
+}
+
+// Загрузка XML файла
+async function loadXMLFromFile() {
+    try {
+        // Пробуем загрузить из localStorage сначала
+        const savedXML = localStorage.getItem('dieselCheckXML');
+        if (savedXML) {
+            const parsed = parseXMLToItems(savedXML);
+            if (parsed) return parsed;
+        }
+        
+        // Если нет в localStorage, загружаем начальный XML
+        return getInitialXMLItems();
+    } catch (error) {
+        console.error('Ошибка загрузки XML:', error);
+        return getInitialXMLItems();
+    }
+}
+
+// Сохранение XML в localStorage
+function saveXMLToStorage(items) {
+    try {
+        const xmlString = convertItemsToXML(items);
+        localStorage.setItem('dieselCheckXML', xmlString);
+        localStorage.setItem('dieselCheckXMLVersion', XML_VERSION);
+        localStorage.setItem('lastXMLUpdate', Date.now().toString());
+        
+        // Сохраняем также в отдельный ключ для обратной совместимости
+        localStorage.setItem('dieselCheckItems', JSON.stringify(items));
+        
+        return true;
+    } catch (error) {
+        console.error('Ошибка сохранения XML:', error);
+        return false;
+    }
+}
+
+// Загрузка бэкапа
+async function loadBackupXML() {
+    try {
+        const backupXML = localStorage.getItem('dieselCheckXMLBackup');
+        if (backupXML) {
+            const parsed = parseXMLToItems(backupXML);
+            if (parsed) return parsed;
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки бэкапа:', error);
+    }
+    return getInitialXMLItems();
+}
+
+// Создание бэкапа
+function createBackup(items) {
+    const xmlString = convertItemsToXML(items);
+    localStorage.setItem('dieselCheckXMLBackup', xmlString);
+    localStorage.setItem('backupTimestamp', Date.now().toString());
+}
+
+// Восстановление из бэкапа
+function restoreFromBackup() {
+    const backupXML = localStorage.getItem('dieselCheckXMLBackup');
+    if (backupXML) {
+        return parseXMLToItems(backupXML);
+    }
+    return getInitialXMLItems();
+}
+
+// Начальные XML данные
+function getInitialXMLItems() {
+    return [
+        { id: 1, title: 'Считывание и анализ ошибок', help: 'Пункт 1: Проверка ошибок.\n1. Подключить ISTA\n2. Открыть накопитель неисправностей\n3. Зафиксировать на фото все имеющиеся неисправности', checked: false },
+        { id: 2, title: 'Проверка параметров двигателя', help: 'Пункт 2: Проверка параметров двигателя.\n1. Подключить ISTA\n2. Вызвать функции ЭБУ DDE (двигателя)\n3. Вывести параметры:\n- Количество об/мин коленчатого вала\n- Температура ОЖ\n- Температура масла\n- Воздушная масса: фактическое и заданное значение\n- Регулятор вихревого клапана: фактическое и заданное положение\n- Перепускной клапан: значение управляющего сигнала\n- Клапан возврата отработавших газов: фактическое и заданное положение\n- Радиатор системы рециркуляции отработавших газов: Температура\n- Противодавление ОГ\n- Сажевый фильтр, регенерация Разрешение\n- Сажевый фильтр Масса сажи\n4. Отследить работу параметров\n5. Зафиксировать на фото работу параметров\n6. Анализ работы параметров\n- Воздушная масса в стоке примерно в 1,5-2 раза меньше заданного значения на холостых\n- Значения вихрей изменяются при нажатии газа', checked: false },
+        { id: 3, title: 'Проверка клапана ЕГР', help: 'Пункт 3:\n1) Функциональная структура\n2) Система воздушных потоков\n3) Клапан возврата отработавших газов\n4) Запуск теста\n- Клапан может принимать ОТРИЦАТЕЛЬНЫЕ значения\n- При проверке после чистки впуска первый раз тест может проходить с нестабильной работой мотора', checked: false },
+        { id: 4, title: 'Проверка байпаса', help: 'Пункт 4:\n1) Функциональная структура\n2) Система воздушных потоков\n3) Байпасная заслонка...\n4) Запуск теста\n- При тесте температура должна изменяться (иначе это следствие багов ПО DDE)\n- Первый тест после чистки впуска может проходить не ровно\n- После чистки впуска делать тест байпаса ПОСЛЕ теста клапана ЕГР', checked: false },
+        { id: 5, title: 'Тест вихревых заслонок', help: 'Пункт 5:\n1) Функциональная структура\n2) Система воздушных потоков\n3) Вихревые клапаны\n4) Запуск теста', checked: false },
+        { id: 6, title: 'Сажа тест противодавление', help: 'Пункт 6:\n1) Функциональная структура\n2) Выпуск ОГ\n3) Сажевый фильтр\n4) Запуск теста', checked: false },
+        { id: 7, title: 'Проверка цепи ТОЛЬКО МОТОРЫ B', help: 'Пункт 7:\n1) Функциональная структура\n2) Механические элементы\n3) Проверка цепи\n4) Запуск теста', checked: false },
+        { id: 8, title: 'Регулировка плавности хода', help: 'Пункт 8:\n1) Сервис функции\n2) Регулировка плавности хода\n3) Запуск теста', checked: false },
+        { id: 9, title: 'Прокачка топливной системы', help: 'Пункт 9:\n1) Сервис функции\n2) Вентиляция топливного бака\n3) Прокачка системы питания\n4) Запуск', checked: false },
+        { id: 10, title: 'Сброс значений коррекции', help: 'Пункт 10:\n1) Сервис функции\n2) Сброс значений коррекции\n3) Запуск\n4) После сброса машину нельзя трогать в течение 3 минут\n- В том числе нельзя открывать двери\n\nСброс значений коррекции для радиатора ОГ также выполняется дополнительно:\n1) Сервис функции\n2) Техническая акция по радиатору ОГ\n3) Сброс коррекций', checked: false },
+        { id: 11, title: 'Монтажное положение клапана ОГ', help: 'Пункт 11:\n1) Сервис функции\n2) Монтаж клапана возврата ОГ\n3) Запуск (клапан должен встать в 30% положение)', checked: false },
+        { id: 12, title: 'Введение новых значений форсунок', help: 'Пункт 12:\n1) Сервис функции\n2) Сброс значений системы питания\n3) ПЕРЕД СБРОСОМ СОХРАНИТЬ СТАРЫЕ ЗНАЧЕНИЯ НА ФОТО\n4) Ввести новые значения\n5) Протестировать работу двигателя (Регулировка плавности хода)', checked: false },
+        { id: 13, title: 'Дополнительный пункт 1', help: 'Пункт 13:', checked: false },
+        { id: 14, title: 'Дополнительный пункт 2', help: 'Пункт 14:\n1)', checked: false }
+    ];
+}

@@ -7,24 +7,29 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="container">
-        <!-- Шапка (не закреплена) -->
-        <div class="header">
-            <h1>🚛 Дизель-Чек</h1>
-            <button class="theme-toggle" onclick="toggleTheme()" id="themeToggle">🌙</button>
-        </div>
-
-        <!-- Кнопки действий -->
-        <div class="action-buttons">
-            <button class="action-btn" onclick="addNewItem()">
-                <span>➕</span> Добавить пункт
+    <!-- Верхняя панель с кнопками (скрывается при скролле) -->
+    <div class="top-bar" id="topBar">
+        <div class="top-bar-content">
+            <button class="top-btn" onclick="addNewItem()">
+                <span>➕</span> Добавить
             </button>
-            <button class="action-btn" onclick="clearAllChecks()">
+            <button class="top-btn" onclick="clearAllChecks()">
                 <span>🗑️</span> Снять все
             </button>
-            <button class="action-btn" onclick="restoreFromBackup()">
+            <button class="top-btn" onclick="restoreFromBackup()">
                 <span>🔄</span> Бэкап
             </button>
+            <button class="theme-toggle-small" onclick="toggleTheme()" id="themeToggleSmall">🌙</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Шапка с заголовком -->
+        <div class="header">
+            <h1>🚛 Дизель-Чек</h1>
+            <div class="header-stats">
+                <span id="completedCount">0</span>/<span id="totalCount">14</span>
+            </div>
         </div>
 
         <!-- Индикатор синхронизации -->
@@ -32,12 +37,8 @@
             <span id="syncStatus">🔄 Синхронизация...</span>
         </div>
 
-        <!-- Статистика -->
-        <div class="stats-panel">
-            <div class="stats-row">
-                <span>Выполнено: <span id="completedCount">0</span>/<span id="totalCount">14</span></span>
-                <span id="progressPercent">0%</span>
-            </div>
+        <!-- Прогресс-бар -->
+        <div class="progress-container">
             <div class="progress-bar">
                 <div class="progress-fill" id="progressFill" style="width: 0%"></div>
             </div>
@@ -46,21 +47,8 @@
         <!-- Список пунктов -->
         <div class="items-list" id="itemsList"></div>
 
-        <!-- Панель справки -->
-        <div class="help-panel">
-            <div class="help-header">
-                <span class="help-title">📖 Справка по пункту</span>
-                <button class="edit-btn" onclick="editCurrentHelp()">
-                    <span>✏️</span> Ред.
-                </button>
-            </div>
-            <div class="help-content" id="helpContent">
-                Выберите пункт для просмотра справки
-            </div>
-        </div>
-
         <!-- Кнопка отправки результатов -->
-        <button class="action-btn submit-btn" onclick="submitResults()">
+        <button class="submit-btn" onclick="submitResults()">
             ✅ ОТПРАВИТЬ РЕЗУЛЬТАТЫ
         </button>
 
@@ -70,12 +58,27 @@
         </div>
     </div>
 
+    <!-- Модальное окно для справки -->
+    <div class="modal" id="helpModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="helpModalTitle">Справка</h3>
+                <button class="modal-close" onclick="closeHelpModal()">✖</button>
+            </div>
+            <div class="modal-help-content" id="modalHelpContent"></div>
+            <div class="modal-buttons" style="margin-top: 20px;">
+                <button class="modal-btn primary" onclick="editCurrentHelp()">✏️ Редактировать</button>
+                <button class="modal-btn secondary" onclick="closeHelpModal()">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Модальное окно редактирования -->
     <div class="modal" id="editModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3 id="modalTitle">Редактирование пункта</h3>
-                <button class="modal-close" onclick="closeModal()">✖</button>
+                <h3 id="editModalTitle">Редактирование</h3>
+                <button class="modal-close" onclick="closeEditModal()">✖</button>
             </div>
             
             <input type="text" class="modal-input" id="editTitle" placeholder="Название пункта">
@@ -83,7 +86,7 @@
             
             <div class="modal-buttons">
                 <button class="modal-btn primary" onclick="saveItem()">Сохранить</button>
-                <button class="modal-btn secondary" onclick="closeModal()">Отмена</button>
+                <button class="modal-btn secondary" onclick="closeEditModal()">Отмена</button>
             </div>
             
             <button class="modal-btn danger" style="margin-top: 12px;" onclick="deleteCurrentItem()" id="deleteBtn">
@@ -93,7 +96,7 @@
     </div>
 
     <!-- Подключаем JavaScript -->
-    <script src="data.js"></script>
+    <script src="xmlParser.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

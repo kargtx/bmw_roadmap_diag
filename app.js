@@ -1,70 +1,80 @@
 // Состояние приложения
 let items = [];
-let selectedItemId = 1;
+let currentItemForHelp = null;
 let currentTheme = 'light';
 let syncInterval = null;
+let lastScrollTop = 0;
 
 // Инициализация при загрузке
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     loadTheme();
-    items = loadItemsFromStorage();
     
-    // Если items пустой или не массив, используем INITIAL_ITEMS
-    if (!items || !Array.isArray(items) || items.length === 0) {
-        items = JSON.parse(JSON.stringify(INITIAL_ITEMS));
+    // Загружаем XML данные
+    items = await loadXMLFromFile();
+    
+    // Создаем бэкап при первом запуске
+    if (!localStorage.getItem('dieselCheckXMLBackup')) {
+        createBackup(items);
     }
     
-    selectedItemId = items[0]?.id || 1;
-    
     renderItems();
-    renderHelp();
     updateLastSyncTime();
     
-    // Запускаем синхронизацию между вкладками
+    // Запускаем синхронизацию
     startSync();
+    
+    // Отслеживаем скролл для верхней панели
+    setupScrollHandler();
 });
 
-// Синхронизация между вкладками/устройствами
+// Настройка обработчика скролла
+function setupScrollHandler() {
+    const topBar = document.getElementById('topBar');
+    
+    window.addEventListener('scroll', () => {
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        
+        if (scrollTop > lastScrollTop && scrollTop > 60) {
+            // Скролл вниз - прячем панель
+            topBar.classList.add('hidden');
+        } else {
+            // Скролл вверх - показываем панель
+            topBar.classList.remove('hidden');
+        }
+        
+        lastScrollTop = scrollTop;
+    });
+}
+
+// Синхронизация между устройствами
 function startSync() {
-    // Слушаем изменения в localStorage из других вкладок
     window.addEventListener('storage', (e) => {
-        if (e.key === 'dieselCheckData' && e.newValue) {
+        if (e.key === 'dieselCheckXML' && e.newValue) {
             try {
-                const newData = JSON.parse(e.newValue);
-                if (newData.items && Array.isArray(newData.items)) {
-                    // Показываем индикатор синхронизации
-                    showSyncIndicator('🔄 Получены обновления...');
-                    
-                    // Обновляем данные
-                    items = newData.items;
-                    
-                    // Проверяем, существует ли выбранный ID
-                    if (!items.find(i => i.id === selectedItemId)) {
-                        selectedItemId = items[0]?.id || null;
-                    }
-                    
+                showSyncIndicator('🔄 Получены обновления...');
+                
+                const newItems = parseXMLToItems(e.newValue);
+                if (newItems) {
+                    items = newItems;
                     renderItems();
-                    renderHelp();
                     updateLastSyncTime();
-                    
-                    setTimeout(() => hideSyncIndicator(), 2000);
                 }
+                
+                setTimeout(() => hideSyncIndicator(), 2000);
             } catch (error) {
                 console.error('Ошибка синхронизации:', error);
             }
         }
     });
     
-    // Периодическая проверка обновлений (для разных устройств)
+    // Периодическая проверка
     syncInterval = setInterval(checkForUpdates, 5000);
 }
 
 // Проверка обновлений
 function checkForUpdates() {
-    const lastSync = localStorage.getItem('lastSyncTime');
-    if (lastSync) {
-        // Здесь можно добавить логику проверки с сервером
-        // Для локального хранения просто обновляем время
+    const lastUpdate = localStorage.getItem('lastXMLUpdate');
+    if (lastUpdate) {
         updateLastSyncTime();
     }
 }
@@ -77,31 +87,33 @@ function showSyncIndicator(message) {
     indicator.classList.add('show');
 }
 
-// Скрыть индикатор синхронизации
+// Скрыть индикатор
 function hideSyncIndicator() {
     const indicator = document.getElementById('syncIndicator');
     indicator.classList.remove('show');
 }
 
-// Обновление времени последней синхронизации
+// Обновление времени синхронизации
 function updateLastSyncTime() {
     const lastSync = document.getElementById('lastSyncTime');
-    if (lastSync) {
-        lastSync.textContent = `Последняя синхронизация: ${getLastSyncTime()}`;
+    const lastUpdate = localStorage.getItem('lastXMLUpdate');
+    if (lastSync && lastUpdate) {
+        const date = new Date(parseInt(lastUpdate));
+        lastSync.textContent = `Последнее обновление: ${date.toLocaleString()}`;
     }
 }
 
 // Восстановление из бэкапа
-function restoreFromBackup() {
+async function restoreFromBackup() {
     if (confirm('Восстановить все справки из бэкапа? Все текущие изменения будут потеряны.')) {
-        showSyncIndicator('🔄 Восстановление из бэкапа...');
+        showSyncIndicator('🔄 Восстановление...');
         
-        items = restoreFromBackup();
-        selectedItemId = items[0]?.id || 1;
-        
-        saveItemsToStorage(items);
-        renderItems();
-        renderHelp();
+        const backupItems = restoreFromBackup();
+        if (backupItems) {
+            items = backupItems;
+            saveXMLToStorage(items);
+            renderItems();
+        }
         
         setTimeout(() => {
             hideSyncIndicator();
@@ -119,19 +131,21 @@ function renderItems() {
     
     items.forEach((item, index) => {
         const card = document.createElement('div');
-        card.className = `item-card ${selectedItemId === item.id ? 'selected' : ''}`;
-        card.onclick = () => selectItem(item.id);
-        
-        const preview = item.help ? item.help.split('\n')[0].substring(0, 40) + '...' : 'Нет справки';
+        card.className = 'item-card';
         
         card.innerHTML = `
-            <div class="item-checkbox ${item.checked ? 'checked' : ''}" onclick="event.stopPropagation(); toggleCheck(${item.id})">
-                ${item.checked ? '✓' : ''}
+            <div class="item-main">
+                <div class="item-checkbox ${item.checked ? 'checked' : ''}" onclick="toggleCheck(${item.id})">
+                    ${item.checked ? '✓' : ''}
+                </div>
+                <div class="item-content">
+                    <div class="item-title">${index + 1}. ${item.title || 'Пункт ' + item.id}</div>
+                    <div class="item-number">ID: ${item.id}</div>
+                </div>
             </div>
-            <div class="item-content">
-                <div class="item-title">${index + 1}. ${item.title || 'Без названия'}</div>
-                <div class="item-preview">${preview}</div>
-            </div>
+            <button class="item-help-btn" onclick="showHelp(${item.id})">
+                <span>📖</span> Показать справку
+            </button>
         `;
         
         list.appendChild(card);
@@ -140,24 +154,22 @@ function renderItems() {
     updateStats();
 }
 
-// Отрисовка справки
-function renderHelp() {
-    const helpContent = document.getElementById('helpContent');
-    if (!helpContent) return;
+// Показать справку
+function showHelp(id) {
+    const item = items.find(i => i.id === id);
+    if (!item) return;
     
-    const item = items.find(i => i.id === selectedItemId);
-    if (item) {
-        helpContent.textContent = item.help || 'Нет справки для этого пункта';
-    } else {
-        helpContent.textContent = 'Выберите пункт для просмотра справки';
-    }
+    currentItemForHelp = id;
+    
+    document.getElementById('helpModalTitle').textContent = item.title || `Пункт ${id}`;
+    document.getElementById('modalHelpContent').textContent = item.help || 'Нет справки для этого пункта';
+    document.getElementById('helpModal').classList.add('active');
 }
 
-// Выбор пункта
-function selectItem(id) {
-    selectedItemId = id;
-    renderItems();
-    renderHelp();
+// Закрыть справку
+function closeHelpModal() {
+    document.getElementById('helpModal').classList.remove('active');
+    currentItemForHelp = null;
 }
 
 // Переключение чекбокса
@@ -166,9 +178,8 @@ function toggleCheck(id) {
     if (item) {
         item.checked = !item.checked;
         renderItems();
-        saveItemsToStorage(items);
+        saveXMLToStorage(items);
         
-        // Показываем индикатор синхронизации
         showSyncIndicator('🔄 Сохранение...');
         setTimeout(() => hideSyncIndicator(), 1000);
     }
@@ -180,58 +191,50 @@ function updateStats() {
     const completed = items.filter(i => i.checked).length;
     const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
     
-    const completedSpan = document.getElementById('completedCount');
-    const totalSpan = document.getElementById('totalCount');
-    const percentSpan = document.getElementById('progressPercent');
-    const progressFill = document.getElementById('progressFill');
-    
-    if (completedSpan) completedSpan.textContent = completed;
-    if (totalSpan) totalSpan.textContent = total;
-    if (percentSpan) percentSpan.textContent = percent + '%';
-    if (progressFill) progressFill.style.width = percent + '%';
+    document.getElementById('completedCount').textContent = completed;
+    document.getElementById('totalCount').textContent = total;
+    document.getElementById('progressFill').style.width = percent + '%';
 }
 
 // Добавление нового пункта
 function addNewItem() {
     const newId = items.length > 0 ? Math.max(...items.map(i => i.id)) + 1 : 1;
-    items.push({
+    const newItem = {
         id: newId,
-        title: 'Новый пункт',
-        help: 'Текст справки для нового пункта',
+        title: `Новый пункт ${newId}`,
+        help: `Пункт ${newId}:\n1) Описание действия`,
         checked: false
-    });
+    };
     
-    saveItemsToStorage(items);
+    items.push(newItem);
+    saveXMLToStorage(items);
+    createBackup(items);
     renderItems();
-    selectItem(newId);
-    openEditModal(newId);
     
-    showSyncIndicator('🔄 Добавлен новый пункт');
+    // Показываем справку для нового пункта
+    showHelp(newId);
+    
+    showSyncIndicator('➕ Добавлен новый пункт');
     setTimeout(() => hideSyncIndicator(), 1500);
 }
 
-// Редактирование текущего пункта
+// Редактирование текущей справки
 function editCurrentHelp() {
-    if (!selectedItemId) {
-        alert('Сначала выберите пункт');
-        return;
-    }
-    openEditModal(selectedItemId);
-}
-
-// Открытие модального окна
-function openEditModal(id) {
-    const item = items.find(i => i.id === id);
+    if (!currentItemForHelp) return;
+    
+    closeHelpModal();
+    
+    const item = items.find(i => i.id === currentItemForHelp);
     if (!item) return;
     
-    document.getElementById('modalTitle').textContent = `Редактирование: ${item.title}`;
+    document.getElementById('editModalTitle').textContent = `Редактирование: ${item.title}`;
     document.getElementById('editTitle').value = item.title || '';
     document.getElementById('editHelp').value = item.help || '';
     document.getElementById('editModal').classList.add('active');
 }
 
-// Закрытие модального окна
-function closeModal() {
+// Закрыть редактирование
+function closeEditModal() {
     document.getElementById('editModal').classList.remove('active');
 }
 
@@ -245,23 +248,23 @@ function saveItem() {
         return;
     }
     
-    const item = items.find(i => i.id === selectedItemId);
+    const item = items.find(i => i.id === currentItemForHelp);
     if (item) {
         item.title = title;
         item.help = help;
         
-        saveItemsToStorage(items);
+        saveXMLToStorage(items);
+        createBackup(items);
         renderItems();
-        renderHelp();
         
         showSyncIndicator('🔄 Изменения сохранены');
         setTimeout(() => hideSyncIndicator(), 1500);
     }
     
-    closeModal();
+    closeEditModal();
 }
 
-// Удаление текущего пункта
+// Удаление пункта
 function deleteCurrentItem() {
     if (items.length <= 1) {
         alert('Нельзя удалить последний пункт');
@@ -269,15 +272,12 @@ function deleteCurrentItem() {
     }
     
     if (confirm('Удалить этот пункт?')) {
-        items = items.filter(i => i.id !== selectedItemId);
+        items = items.filter(i => i.id !== currentItemForHelp);
         
-        // Выбираем первый доступный пункт
-        selectedItemId = items[0]?.id || null;
-        
-        saveItemsToStorage(items);
+        saveXMLToStorage(items);
+        createBackup(items);
         renderItems();
-        renderHelp();
-        closeModal();
+        closeEditModal();
         
         showSyncIndicator('🔄 Пункт удален');
         setTimeout(() => hideSyncIndicator(), 1500);
@@ -288,7 +288,7 @@ function deleteCurrentItem() {
 function clearAllChecks() {
     items.forEach(item => item.checked = false);
     renderItems();
-    saveItemsToStorage(items);
+    saveXMLToStorage(items);
     
     showSyncIndicator('🔄 Отметки сняты');
     setTimeout(() => hideSyncIndicator(), 1000);
@@ -308,7 +308,7 @@ function submitResults() {
             message += `• ${item.title}\n`;
         });
     } else {
-        message += '🎉 Все пункты отмечены! Отличная работа!';
+        message += '🎉 Все пункты отмечены!';
     }
     
     alert(message);
@@ -317,7 +317,7 @@ function submitResults() {
 // Переключение темы
 function toggleTheme() {
     const body = document.body;
-    const themeToggle = document.getElementById('themeToggle');
+    const themeToggle = document.getElementById('themeToggleSmall');
     
     if (body.getAttribute('data-theme') === 'dark') {
         body.removeAttribute('data-theme');
@@ -332,35 +332,48 @@ function toggleTheme() {
     localStorage.setItem('theme', currentTheme);
 }
 
-// Загрузка сохраненной темы
+// Загрузка темы
 function loadTheme() {
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'dark') {
         document.body.setAttribute('data-theme', 'dark');
-        document.getElementById('themeToggle').textContent = '☀️';
+        document.getElementById('themeToggleSmall').textContent = '☀️';
         currentTheme = 'dark';
     }
 }
 
-// Обработка свайпа вниз для закрытия модалки на телефоне
-let touchStartY = 0;
-const modal = document.getElementById('editModal');
-
-if (modal) {
-    modal.addEventListener('touchstart', (e) => {
-        touchStartY = e.touches[0].clientY;
-    });
-
-    modal.addEventListener('touchmove', (e) => {
-        if (touchStartY > e.touches[0].clientY + 50) {
-            closeModal();
-        }
-    });
-}
-
-// Очистка интервала при выгрузке страницы
+// Очистка интервала
 window.addEventListener('beforeunload', () => {
     if (syncInterval) {
         clearInterval(syncInterval);
     }
 });
+
+// Обработка свайпов для модалок
+let touchStartY = 0;
+
+const helpModal = document.getElementById('helpModal');
+if (helpModal) {
+    helpModal.addEventListener('touchstart', (e) => {
+        touchStartY = e.touches[0].clientY;
+    });
+
+    helpModal.addEventListener('touchmove', (e) => {
+        if (touchStartY > e.touches[0].clientY + 50) {
+            closeHelpModal();
+        }
+    });
+}
+
+const editModal = document.getElementById('editModal');
+if (editModal) {
+    editModal.addEventListener('touchstart', (e) => {
+        touchStartY = e.touches[0].clientY;
+    });
+
+    editModal.addEventListener('touchmove', (e) => {
+        if (touchStartY > e.touches[0].clientY + 50) {
+            closeEditModal();
+        }
+    });
+}
