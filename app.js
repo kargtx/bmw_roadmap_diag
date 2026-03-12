@@ -19,7 +19,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupVehicleInputs();
 
     await loadItemsFromServer();
-    await loadInspections();
 
     renderItems();
     updateLastSyncTime();
@@ -170,15 +169,21 @@ async function saveItemsToServer(password) {
         }))
     };
 
-    const response = await fetch('/api/items', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    });
+    let response;
+    try {
+        response = await fetch('/api/items', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+    } catch (error) {
+        throw new Error('Сервер недоступен. Запустите server.js');
+    }
 
     if (!response.ok) {
         const result = await response.json().catch(() => ({}));
-        throw new Error(result.error || 'Ошибка сохранения');
+        const message = result.error || `Ошибка сохранения (код ${response.status})`;
+        throw new Error(message);
     }
 
     const data = await response.json();
@@ -352,6 +357,7 @@ async function editCurrentHelp() {
     document.getElementById('editHelp').value = item.help || '';
     document.getElementById('editModal').classList.add('active');
 
+    
     // Блокируем скролл body
     document.body.style.overflow = 'hidden';
 }
@@ -639,6 +645,19 @@ async function saveInspection(inspection) {
         });
     } catch (error) {
         console.error('Ошибка сохранения проверки:', error);
+    }
+}
+
+// Открыть проверки мастера (по паролю)
+async function unlockInspections() {
+    const password = await requireEditPassword();
+    if (!password) return;
+
+    await loadInspections();
+
+    const container = document.getElementById('inspectionsList');
+    if (container) {
+        container.classList.remove('hidden');
     }
 }
 
