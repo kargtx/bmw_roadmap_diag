@@ -7,6 +7,19 @@ let lastScrollTop = 0;
 let isAtTop = true;
 let lastItemsUpdate = 0;
 let editSessionPassword = null;
+let inspectionsUnlocked = false;
+
+const API_BASE = (() => {
+    if (location.origin && location.origin.startsWith('http')) {
+        const host = location.hostname;
+        const port = location.port;
+        if ((host === 'localhost' || host === '127.0.0.1') && port && port !== '3000') {
+            return 'http://localhost:3000';
+        }
+        return location.origin;
+    }
+    return 'http://localhost:3000';
+})();
 
 const EDIT_PASSWORD = '7788';
 const PROGRESS_KEY = 'dieselCheckProgress';
@@ -98,7 +111,7 @@ function updateLastSyncTime() {
 // Загрузка пунктов с сервера
 async function loadItemsFromServer() {
     try {
-        const response = await fetch('/api/items');
+        const response = await fetch(`${API_BASE}/api/items`);
         if (!response.ok) throw new Error('Ошибка загрузки');
         const data = await response.json();
         if (!data || !Array.isArray(data.items)) throw new Error('Некорректный формат');
@@ -129,7 +142,7 @@ async function loadItemsFromServer() {
 }
 
 async function refreshItemsIfUpdated() {
-    const response = await fetch('/api/items');
+    const response = await fetch(`${API_BASE}/api/items`);
     if (!response.ok) return;
     const data = await response.json();
     if (!data || !Array.isArray(data.items)) return;
@@ -171,7 +184,7 @@ async function saveItemsToServer(password) {
 
     let response;
     try {
-        response = await fetch('/api/items', {
+        response = await fetch(`${API_BASE}/api/items`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -199,7 +212,7 @@ async function restoreFromBackupFlow() {
     if (confirm('Восстановить все справки из файла бэкапа? Все текущие изменения будут потеряны.')) {
         showSyncIndicator('🔄 Восстановление из бэкапа...');
 
-        const response = await fetch('/api/restore', {
+        const response = await fetch(`${API_BASE}/api/restore`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ password })
@@ -239,6 +252,7 @@ function renderItems() {
     list.innerHTML = '';
 
     items.forEach((item, index) => {
+        const displayTitle = getDisplayTitle(item);
         const card = document.createElement('div');
         card.className = 'item-card';
 
@@ -248,7 +262,7 @@ function renderItems() {
                     ${item.checked ? '✓' : ''}
                 </div>
                 <div class="item-content">
-                    <div class="item-title">${index + 1}. ${item.title || 'Пункт ' + item.id}</div>
+                    <div class="item-title">${index + 1}. ${displayTitle}</div>
                     <div class="item-number">ID: ${item.id}</div>
                 </div>
             </div>
@@ -270,7 +284,7 @@ function showHelp(id) {
 
     currentItemForHelp = id;
 
-    document.getElementById('helpModalTitle').textContent = item.title || `Пункт ${id}`;
+    document.getElementById('helpModalTitle').textContent = getDisplayTitle(item);
     document.getElementById('modalHelpContent').textContent = item.help || 'Нет справки для этого пункта';
     document.getElementById('helpModal').classList.add('active');
 
@@ -352,8 +366,9 @@ async function editCurrentHelp() {
     const item = items.find(i => i.id === itemId);
     if (!item) return;
 
-    document.getElementById('editModalTitle').textContent = `Редактирование: ${item.title}`;
-    document.getElementById('editTitle').value = item.title || '';
+    const displayTitle = getDisplayTitle(item);
+    document.getElementById('editModalTitle').textContent = `Редактирование: ${displayTitle}`;
+    document.getElementById('editTitle').value = item.title && !isPlaceholderTitle(item.title) ? item.title : displayTitle;
     document.getElementById('editHelp').value = item.help || '';
     document.getElementById('editModal').classList.add('active');
 
@@ -478,7 +493,11 @@ async function finishInspection() {
         completedAt: new Date().toISOString()
     });
 
-    await loadInspections();
+    if (inspectionsUnlocked) {
+        await loadInspections();
+        const container = document.getElementById('inspectionsList');
+        if (container) container.classList.remove('hidden');
+    }
 }
 
 // Переключение темы
@@ -565,6 +584,26 @@ function loadVehicleInfo() {
     }
 }
 
+function getDisplayTitle(item) {
+    if (!item) return 'Без названия';
+    if (item.title && !isPlaceholderTitle(item.title)) return item.title;
+    const derived = deriveTitleFromHelp(item.help, item.id);
+    return derived || (item.title || `Пункт ${item.id}`);
+}
+
+function isPlaceholderTitle(title) {
+    if (!title) return true;
+    return /^Пункт\\s*\\d+/i.test(title.trim());
+}
+
+function deriveTitleFromHelp(helpText, id) {
+    if (!helpText) return `Пункт ${id}`;
+    const firstLine = helpText.split('\\n')[0].trim();
+    if (!firstLine) return `Пункт ${id}`;
+    const cleaned = firstLine.replace(/^Пункт\\s*\\d+\\s*[:\\-]?\\s*/i, '').trim();
+    return cleaned || firstLine;
+}
+
 // Прогресс локально
 function saveProgress() {
     const checkedIds = items.filter(i => i.checked).map(i => i.id);
@@ -598,7 +637,7 @@ async function requireEditPassword() {
 // Панель мастера
 async function loadInspections() {
     try {
-        const response = await fetch('/api/inspections');
+        const response = await fetch(`${API_BASE}/api/inspections`);
         if (!response.ok) throw new Error('Ошибка загрузки');
         const data = await response.json();
         renderInspections(Array.isArray(data) ? data : []);
@@ -638,7 +677,7 @@ function renderInspections(list) {
 
 async function saveInspection(inspection) {
     try {
-        await fetch('/api/inspections', {
+        await fetch(`${API_BASE}/api/inspections`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ inspection })
@@ -653,6 +692,7 @@ async function unlockInspections() {
     const password = await requireEditPassword();
     if (!password) return;
 
+    inspectionsUnlocked = true;
     await loadInspections();
 
     const container = document.getElementById('inspectionsList');

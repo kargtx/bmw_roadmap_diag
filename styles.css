@@ -24,6 +24,7 @@
     --sync-bg: #fff3cd;
     --sync-text: #856404;
     --top-bar-bg: #424e2b;
+    --accent-text: #f5efe3;
 }
 
 [data-theme="dark"] {
@@ -44,6 +45,7 @@
     --sync-bg: #3d3d3d;
     --sync-text: #FFE788;
     --top-bar-bg: #2d2d2d;
+    --accent-text: #FFE788;
 }
 
 body {
@@ -95,7 +97,7 @@ body {
     flex: 1;
     background: var(--accent);
     border: none;
-    color: var(--header-text);
+    color: var(--accent-text);
     padding: 10px 8px;
     border-radius: 30px;
     font-size: 0.8rem;
@@ -118,7 +120,7 @@ body {
 .theme-toggle-small {
     background: var(--accent);
     border: none;
-    color: var(--header-text);
+    color: var(--accent-text);
     font-size: 1.2rem;
     width: 40px;
     height: 40px;
@@ -172,6 +174,12 @@ body {
     padding: 10px 12px;
     margin-bottom: 12px;
     box-shadow: 0 2px 4px var(--shadow);
+    position: fixed;
+    top: 70px;
+    right: 12px;
+    width: 280px;
+    max-width: calc(100vw - 24px);
+    z-index: 120;
 }
 
 .tools-panel summary {
@@ -200,7 +208,7 @@ body {
 .tool-btn {
     background: var(--accent);
     border: none;
-    color: var(--text-primary);
+    color: var(--accent-text);
     padding: 12px;
     border-radius: 14px;
     font-weight: 600;
@@ -390,7 +398,7 @@ body {
 .item-help-btn {
     background: var(--accent);
     border: none;
-    color: var(--text-primary);
+    color: var(--accent-text);
     padding: 10px 16px;
     border-radius: 30px;
     font-size: 0.9rem;
