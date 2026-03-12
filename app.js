@@ -5,25 +5,28 @@ let currentTheme = 'light';
 let syncInterval = null;
 let lastScrollTop = 0;
 let isAtTop = true;
+let lastItemsUpdate = 0;
+let editSessionPassword = null;
+
+const EDIT_PASSWORD = '7788';
+const PROGRESS_KEY = 'dieselCheckProgress';
+const VEHICLE_KEY = 'dieselCheckVehicle';
 
 // Инициализация при загрузке
 document.addEventListener('DOMContentLoaded', async () => {
     loadTheme();
-    
-    // Загружаем XML данные
-    items = await loadXMLFromFile();
-    
-    // Создаем бэкап при первом запуске
-    if (!localStorage.getItem('dieselCheckXMLBackup')) {
-        createBackup(items);
-    }
-    
+    loadVehicleInfo();
+    setupVehicleInputs();
+
+    await loadItemsFromServer();
+    await loadInspections();
+
     renderItems();
     updateLastSyncTime();
-    
+
     // Запускаем синхронизацию
     startSync();
-    
+
     // Отслеживаем скролл
     setupScrollHandler();
 });
@@ -32,51 +35,42 @@ document.addEventListener('DOMContentLoaded', async () => {
 function setupScrollHandler() {
     const topBar = document.getElementById('topBar');
     const progressContainer = document.getElementById('progressContainer');
-    
+
     window.addEventListener('scroll', () => {
         const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-        
+
         // Проверяем, находится ли пользователь вверху страницы
         isAtTop = scrollTop < 50;
-        
+
         // Показываем/скрываем прогресс-бар
         if (isAtTop) {
             progressContainer.classList.remove('hidden');
         } else {
             progressContainer.classList.add('hidden');
         }
-        
+
         // Скрываем верхнюю панель при скролле вниз
         if (scrollTop > lastScrollTop && scrollTop > 60) {
             topBar.classList.add('hidden');
         } else {
             topBar.classList.remove('hidden');
         }
-        
+
         lastScrollTop = scrollTop;
     });
 }
 
-// Синхронизация между устройствами
+// Синхронизация с сервером
 function startSync() {
-    window.addEventListener('storage', (e) => {
-        if (e.key === 'dieselCheckXML' && e.newValue) {
-            try {
-                showSyncIndicator('🔄 Получены обновления...');
-                
-                const newItems = parseXMLToItems(e.newValue);
-                if (newItems) {
-                    items = newItems;
-                    renderItems();
-                    updateLastSyncTime();
-                }
-                
-                setTimeout(() => hideSyncIndicator(), 2000);
-            } catch (error) {
-                console.error('Ошибка синхронизации:', error);
-            }
+    if (syncInterval) clearInterval(syncInterval);
+
+    syncInterval = setInterval(async () => {
+        try {
+            await refreshItemsIfUpdated();
+        } catch (error) {
+            console.error('Ошибка синхронизации:', error);
         }
-    });
+    }, 20000);
 }
 
 // Показать индикатор синхронизации
@@ -96,25 +90,135 @@ function hideSyncIndicator() {
 // Обновление времени синхронизации
 function updateLastSyncTime() {
     const lastSync = document.getElementById('lastSyncTime');
-    const lastUpdate = localStorage.getItem('lastXMLUpdate');
-    if (lastSync && lastUpdate) {
-        const date = new Date(parseInt(lastUpdate));
+    if (lastSync && lastItemsUpdate) {
+        const date = new Date(lastItemsUpdate);
         lastSync.textContent = `Последнее обновление: ${date.toLocaleString()}`;
     }
 }
 
+// Загрузка пунктов с сервера
+async function loadItemsFromServer() {
+    try {
+        const response = await fetch('/api/items');
+        if (!response.ok) throw new Error('Ошибка загрузки');
+        const data = await response.json();
+        if (!data || !Array.isArray(data.items)) throw new Error('Некорректный формат');
+
+        lastItemsUpdate = data.updatedAt || Date.now();
+        items = data.items.map(item => ({
+            id: item.id,
+            title: item.title,
+            help: item.help,
+            checked: false
+        }));
+
+        try {
+            saveXMLToStorage(items);
+        } catch (error) {
+            console.error('Ошибка кэширования:', error);
+        }
+
+        applyLocalProgress();
+        updateLastSyncTime();
+        return true;
+    } catch (error) {
+        console.error('Ошибка загрузки с сервера:', error);
+        items = await loadXMLFromFile();
+        applyLocalProgress();
+        return false;
+    }
+}
+
+async function refreshItemsIfUpdated() {
+    const response = await fetch('/api/items');
+    if (!response.ok) return;
+    const data = await response.json();
+    if (!data || !Array.isArray(data.items)) return;
+
+    if (data.updatedAt && data.updatedAt > lastItemsUpdate) {
+        showSyncIndicator('🔄 Получены обновления...');
+
+        lastItemsUpdate = data.updatedAt;
+        items = data.items.map(item => ({
+            id: item.id,
+            title: item.title,
+            help: item.help,
+            checked: false
+        }));
+
+        try {
+            saveXMLToStorage(items);
+        } catch (error) {
+            console.error('Ошибка кэширования:', error);
+        }
+
+        applyLocalProgress();
+        renderItems();
+        updateLastSyncTime();
+
+        setTimeout(() => hideSyncIndicator(), 1500);
+    }
+}
+
+async function saveItemsToServer(password) {
+    const payload = {
+        password,
+        items: items.map(item => ({
+            id: item.id,
+            title: item.title,
+            help: item.help
+        }))
+    };
+
+    const response = await fetch('/api/items', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        throw new Error(result.error || 'Ошибка сохранения');
+    }
+
+    const data = await response.json();
+    lastItemsUpdate = data.updatedAt || Date.now();
+    updateLastSyncTime();
+}
+
 // Восстановление из файла бэкапа
-async function restoreFromBackupFile() {
+async function restoreFromBackupFlow() {
+    const password = await requireEditPassword();
+    if (!password) return;
+
     if (confirm('Восстановить все справки из файла бэкапа? Все текущие изменения будут потеряны.')) {
         showSyncIndicator('🔄 Восстановление из бэкапа...');
-        
-        const backupItems = await restoreFromBackupFile();
-        if (backupItems) {
-            items = backupItems;
-            saveXMLToStorage(items);
-            renderItems();
+
+        const response = await fetch('/api/restore', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password })
+        });
+
+        if (!response.ok) {
+            hideSyncIndicator();
+            alert('Не удалось восстановить справки');
+            return;
         }
-        
+
+        const data = await response.json();
+        lastItemsUpdate = data.updatedAt || Date.now();
+        items = data.items.map(item => ({
+            id: item.id,
+            title: item.title,
+            help: item.help,
+            checked: false
+        }));
+
+        applyLocalProgress();
+        renderItems();
+        updateLastSyncTime();
+
         setTimeout(() => {
             hideSyncIndicator();
             alert('Справки восстановлены из файла бэкапа!');
@@ -126,13 +230,13 @@ async function restoreFromBackupFile() {
 function renderItems() {
     const list = document.getElementById('itemsList');
     if (!list) return;
-    
+
     list.innerHTML = '';
-    
+
     items.forEach((item, index) => {
         const card = document.createElement('div');
         card.className = 'item-card';
-        
+
         card.innerHTML = `
             <div class="item-main">
                 <div class="item-checkbox ${item.checked ? 'checked' : ''}" onclick="toggleCheck(${item.id})">
@@ -147,10 +251,10 @@ function renderItems() {
                 <span>📖</span> Показать справку
             </button>
         `;
-        
+
         list.appendChild(card);
     });
-    
+
     updateStats();
 }
 
@@ -158,13 +262,13 @@ function renderItems() {
 function showHelp(id) {
     const item = items.find(i => i.id === id);
     if (!item) return;
-    
+
     currentItemForHelp = id;
-    
+
     document.getElementById('helpModalTitle').textContent = item.title || `Пункт ${id}`;
     document.getElementById('modalHelpContent').textContent = item.help || 'Нет справки для этого пункта';
     document.getElementById('helpModal').classList.add('active');
-    
+
     // Блокируем скролл body
     document.body.style.overflow = 'hidden';
 }
@@ -172,8 +276,7 @@ function showHelp(id) {
 // Закрыть справку
 function closeHelpModal() {
     document.getElementById('helpModal').classList.remove('active');
-    currentItemForHelp = null;
-    
+
     // Возвращаем скролл body
     document.body.style.overflow = '';
 }
@@ -184,8 +287,8 @@ function toggleCheck(id) {
     if (item) {
         item.checked = !item.checked;
         renderItems();
-        saveXMLToStorage(items);
-        
+        saveProgress();
+
         showSyncIndicator('🔄 Сохранение...');
         setTimeout(() => hideSyncIndicator(), 1000);
     }
@@ -196,7 +299,7 @@ function updateStats() {
     const total = items.length;
     const completed = items.filter(i => i.checked).length;
     const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
-    
+
     document.getElementById('completedCount').textContent = completed;
     document.getElementById('totalCount').textContent = total;
     document.getElementById('progressFill').style.width = percent + '%';
@@ -204,7 +307,10 @@ function updateStats() {
 }
 
 // Добавление нового пункта
-function addNewItem() {
+async function addNewItem() {
+    const password = await requireEditPassword();
+    if (!password) return;
+
     const newId = items.length > 0 ? Math.max(...items.map(i => i.id)) + 1 : 1;
     const newItem = {
         id: newId,
@@ -212,33 +318,40 @@ function addNewItem() {
         help: `Пункт ${newId}:\n1) Описание действия`,
         checked: false
     };
-    
+
     items.push(newItem);
-    saveXMLToStorage(items);
-    createBackup(items);
-    renderItems();
-    
-    // Показываем справку для нового пункта
-    showHelp(newId);
-    
-    showSyncIndicator('➕ Добавлен новый пункт');
-    setTimeout(() => hideSyncIndicator(), 1500);
+
+    try {
+        await saveItemsToServer(password);
+        renderItems();
+        showHelp(newId);
+
+        showSyncIndicator('➕ Добавлен новый пункт');
+        setTimeout(() => hideSyncIndicator(), 1500);
+    } catch (error) {
+        alert(error.message || 'Ошибка сохранения');
+    }
 }
 
 // Редактирование текущей справки
-function editCurrentHelp() {
+async function editCurrentHelp() {
     if (!currentItemForHelp) return;
-    
+
+    const password = await requireEditPassword();
+    if (!password) return;
+    editSessionPassword = password;
+
+    const itemId = currentItemForHelp;
     closeHelpModal();
-    
-    const item = items.find(i => i.id === currentItemForHelp);
+
+    const item = items.find(i => i.id === itemId);
     if (!item) return;
-    
+
     document.getElementById('editModalTitle').textContent = `Редактирование: ${item.title}`;
     document.getElementById('editTitle').value = item.title || '';
     document.getElementById('editHelp').value = item.help || '';
     document.getElementById('editModal').classList.add('active');
-    
+
     // Блокируем скролл body
     document.body.style.overflow = 'hidden';
 }
@@ -246,54 +359,66 @@ function editCurrentHelp() {
 // Закрыть редактирование
 function closeEditModal() {
     document.getElementById('editModal').classList.remove('active');
-    
+
     // Возвращаем скролл body
     document.body.style.overflow = '';
 }
 
 // Сохранение изменений
-function saveItem() {
+async function saveItem() {
     const title = document.getElementById('editTitle').value.trim();
     const help = document.getElementById('editHelp').value.trim();
-    
+
     if (!title) {
         alert('Введите название пункта');
         return;
     }
-    
+
     const item = items.find(i => i.id === currentItemForHelp);
     if (item) {
         item.title = title;
         item.help = help;
-        
-        saveXMLToStorage(items);
-        createBackup(items);
-        renderItems();
-        
-        showSyncIndicator('🔄 Изменения сохранены');
-        setTimeout(() => hideSyncIndicator(), 1500);
+
+        try {
+            const password = editSessionPassword || await requireEditPassword();
+            if (!password) return;
+
+            await saveItemsToServer(password);
+            renderItems();
+
+            showSyncIndicator('🔄 Изменения сохранены');
+            setTimeout(() => hideSyncIndicator(), 1500);
+        } catch (error) {
+            alert(error.message || 'Ошибка сохранения');
+        }
     }
-    
+
     closeEditModal();
 }
 
 // Удаление пункта
-function deleteCurrentItem() {
+async function deleteCurrentItem() {
     if (items.length <= 1) {
         alert('Нельзя удалить последний пункт');
         return;
     }
-    
+
+    const password = await requireEditPassword();
+    if (!password) return;
+
     if (confirm('Удалить этот пункт?')) {
         items = items.filter(i => i.id !== currentItemForHelp);
-        
-        saveXMLToStorage(items);
-        createBackup(items);
-        renderItems();
-        closeEditModal();
-        
-        showSyncIndicator('🔄 Пункт удален');
-        setTimeout(() => hideSyncIndicator(), 1500);
+
+        try {
+            await saveItemsToServer(password);
+            renderItems();
+            closeEditModal();
+
+            showSyncIndicator('🔄 Пункт удален');
+            setTimeout(() => hideSyncIndicator(), 1500);
+        } catch (error) {
+            alert(error.message || 'Ошибка сохранения');
+        }
     }
 }
 
@@ -301,20 +426,32 @@ function deleteCurrentItem() {
 function clearAllChecks() {
     items.forEach(item => item.checked = false);
     renderItems();
-    saveXMLToStorage(items);
-    
+    saveProgress();
+
     showSyncIndicator('🔄 Отметки сняты');
     setTimeout(() => hideSyncIndicator(), 1000);
 }
 
 // Окончить проверку
-function finishInspection() {
-    const completed = items.filter(i => i.checked).length;
+async function finishInspection() {
+    const vehicle = getVehicleInfo();
+    if (!vehicle.modelCode || !vehicle.plate) {
+        alert('Заполните код модели и госномер');
+        return;
+    }
+
+    if (!isValidPlate(vehicle.plate)) {
+        alert('Госномер должен быть в формате Х666ХХ666');
+        return;
+    }
+
+    const completedItems = items.filter(i => i.checked).map(i => ({ id: i.id, title: i.title }));
     const total = items.length;
+    const completed = completedItems.length;
     const notCompleted = items.filter(i => !i.checked);
-    
+
     let message = `✅ Выполнено: ${completed}/${total} (${Math.round(completed/total*100)}%)\n\n`;
-    
+
     if (notCompleted.length > 0) {
         message += '❌ Не отмечены:\n';
         notCompleted.forEach(item => {
@@ -323,25 +460,36 @@ function finishInspection() {
     } else {
         message += '🎉 Все пункты отмечены! Проверка завершена.';
     }
-    
+
     alert(message);
+
+    await saveInspection({
+        modelCode: vehicle.modelCode,
+        plate: vehicle.plate,
+        completed,
+        total,
+        completedItems,
+        completedAt: new Date().toISOString()
+    });
+
+    await loadInspections();
 }
 
 // Переключение темы
 function toggleTheme() {
     const body = document.body;
     const themeToggle = document.getElementById('themeToggleSmall');
-    
+
     if (body.getAttribute('data-theme') === 'dark') {
         body.removeAttribute('data-theme');
-        themeToggle.textContent = '🌙';
+        themeToggle.textContent = '🌙 Сменить тему';
         currentTheme = 'light';
     } else {
         body.setAttribute('data-theme', 'dark');
-        themeToggle.textContent = '☀️';
+        themeToggle.textContent = '☀️ Сменить тему';
         currentTheme = 'dark';
     }
-    
+
     localStorage.setItem('theme', currentTheme);
 }
 
@@ -350,8 +498,147 @@ function loadTheme() {
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'dark') {
         document.body.setAttribute('data-theme', 'dark');
-        document.getElementById('themeToggleSmall').textContent = '☀️';
+        const btn = document.getElementById('themeToggleSmall');
+        if (btn) btn.textContent = '☀️ Сменить тему';
         currentTheme = 'dark';
+    }
+}
+
+// Данные автомобиля
+function setupVehicleInputs() {
+    const modelInput = document.getElementById('modelCodeInput');
+    const plateInput = document.getElementById('plateInput');
+    if (!modelInput || !plateInput) return;
+
+    modelInput.addEventListener('input', () => {
+        modelInput.value = modelInput.value.toUpperCase().replace(/\s+/g, '');
+        saveVehicleInfo();
+    });
+
+    plateInput.addEventListener('input', () => {
+        plateInput.value = formatPlateInput(plateInput.value);
+        saveVehicleInfo();
+    });
+}
+
+function formatPlateInput(value) {
+    const cleaned = value.toUpperCase().replace(/[^A-ZА-Я0-9]/g, '');
+    return cleaned.slice(0, 9);
+}
+
+function isValidPlate(value) {
+    const normalized = value.toUpperCase();
+    return /^[A-ZА-Я]\d{3}[A-ZА-Я]{2}\d{3}$/.test(normalized);
+}
+
+function getVehicleInfo() {
+    const modelInput = document.getElementById('modelCodeInput');
+    const plateInput = document.getElementById('plateInput');
+    return {
+        modelCode: modelInput ? modelInput.value.trim() : '',
+        plate: plateInput ? plateInput.value.trim().toUpperCase() : ''
+    };
+}
+
+function saveVehicleInfo() {
+    const info = getVehicleInfo();
+    localStorage.setItem(VEHICLE_KEY, JSON.stringify(info));
+}
+
+function loadVehicleInfo() {
+    try {
+        const raw = localStorage.getItem(VEHICLE_KEY);
+        if (!raw) return;
+        const info = JSON.parse(raw);
+        const modelInput = document.getElementById('modelCodeInput');
+        const plateInput = document.getElementById('plateInput');
+        if (modelInput && info.modelCode) modelInput.value = info.modelCode;
+        if (plateInput && info.plate) plateInput.value = info.plate;
+    } catch (error) {
+        console.error('Ошибка загрузки данных авто:', error);
+    }
+}
+
+// Прогресс локально
+function saveProgress() {
+    const checkedIds = items.filter(i => i.checked).map(i => i.id);
+    localStorage.setItem(PROGRESS_KEY, JSON.stringify(checkedIds));
+}
+
+function applyLocalProgress() {
+    try {
+        const raw = localStorage.getItem(PROGRESS_KEY);
+        if (!raw) return;
+        const checkedIds = new Set(JSON.parse(raw));
+        items.forEach(item => {
+            item.checked = checkedIds.has(item.id);
+        });
+    } catch (error) {
+        console.error('Ошибка прогресса:', error);
+    }
+}
+
+// Пароль
+async function requireEditPassword() {
+    const pass = prompt('Введите пароль для редактирования');
+    if (!pass) return null;
+    if (pass !== EDIT_PASSWORD) {
+        alert('Неверный пароль');
+        return null;
+    }
+    return pass;
+}
+
+// Панель мастера
+async function loadInspections() {
+    try {
+        const response = await fetch('/api/inspections');
+        if (!response.ok) throw new Error('Ошибка загрузки');
+        const data = await response.json();
+        renderInspections(Array.isArray(data) ? data : []);
+    } catch (error) {
+        console.error('Ошибка загрузки проверок:', error);
+        renderInspections([]);
+    }
+}
+
+function renderInspections(list) {
+    const container = document.getElementById('inspectionsList');
+    if (!container) return;
+
+    if (!list.length) {
+        container.innerHTML = '<div class="inspection-card">Проверок пока нет</div>';
+        return;
+    }
+
+    container.innerHTML = '';
+    list.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'inspection-card';
+
+        const completedAt = item.completedAt ? new Date(item.completedAt).toLocaleString() : '';
+        const completedItems = Array.isArray(item.completedItems) ? item.completedItems : [];
+        const listText = completedItems.map(i => `• ${i.title}`).join('\n');
+
+        card.innerHTML = `
+            <div class="inspection-title">${item.modelCode || 'Без модели'} • ${item.plate || 'Без номера'}</div>
+            <div class="inspection-meta">${completedAt} • ${item.completed || 0}/${item.total || 0} пунктов</div>
+            <div class="inspection-items">${listText || 'Нет отмеченных пунктов'}</div>
+        `;
+
+        container.appendChild(card);
+    });
+}
+
+async function saveInspection(inspection) {
+    try {
+        await fetch('/api/inspections', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ inspection })
+        });
+    } catch (error) {
+        console.error('Ошибка сохранения проверки:', error);
     }
 }
 

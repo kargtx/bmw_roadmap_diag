@@ -16,10 +16,6 @@
             <button class="top-btn" onclick="clearAllChecks()">
                 <span>🗑️</span> Снять все
             </button>
-            <button class="top-btn" onclick="restoreFromBackupFile()">
-                <span>🔄</span> Бэкап
-            </button>
-            <button class="theme-toggle-small" onclick="toggleTheme()" id="themeToggleSmall">🌙</button>
         </div>
     </div>
 
@@ -29,6 +25,19 @@
             <h1>🚛 Дизель-Чек</h1>
             <div class="header-stats" id="headerStats">
                 <span id="completedCount">0</span>/<span id="totalCount">14</span>
+            </div>
+        </div>
+
+        <!-- Данные автомобиля -->
+        <div class="vehicle-bar">
+            <div class="vehicle-field">
+                <label for="modelCodeInput">Код модели BMW</label>
+                <input type="text" id="modelCodeInput" placeholder="Например: G30" maxlength="12">
+            </div>
+            <div class="vehicle-field">
+                <label for="plateInput">Госномер</label>
+                <input type="text" id="plateInput" placeholder="Х666ХХ666" maxlength="9">
+                <div class="field-hint">Формат: Х666ХХ666</div>
             </div>
         </div>
 
@@ -46,6 +55,25 @@
         <div class="sync-indicator" id="syncIndicator">
             <span id="syncStatus">🔄 Синхронизация...</span>
         </div>
+
+        <!-- Панель инструментов -->
+        <details class="tools-panel" id="toolsPanel">
+            <summary>Панель инструментов</summary>
+            <div class="tools-content">
+                <button class="tool-btn" onclick="restoreFromBackupFlow()">
+                    🔄 Восстановить из бэкапа
+                </button>
+                <button class="tool-btn" onclick="toggleTheme()" id="themeToggleSmall">
+                    🌙 Сменить тему
+                </button>
+            </div>
+        </details>
+
+        <!-- Панель мастера -->
+        <details class="master-panel" id="masterPanel" open>
+            <summary>Панель мастера</summary>
+            <div class="master-content" id="inspectionsList"></div>
+        </details>
 
         <!-- Список пунктов -->
         <div class="items-list" id="itemsList"></div>

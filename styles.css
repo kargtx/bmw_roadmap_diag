@@ -130,6 +130,110 @@ body {
     flex-shrink: 0;
 }
 
+/* Данные автомобиля */
+.vehicle-bar {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 12px;
+    margin-bottom: 12px;
+    display: grid;
+    gap: 12px;
+}
+
+.vehicle-field label {
+    display: block;
+    font-size: 0.85rem;
+    margin-bottom: 6px;
+    opacity: 0.8;
+}
+
+.vehicle-field input {
+    width: 100%;
+    padding: 12px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--text-primary);
+    font-size: 1rem;
+}
+
+.field-hint {
+    font-size: 0.75rem;
+    margin-top: 4px;
+    opacity: 0.7;
+}
+
+/* Панели */
+.tools-panel,
+.master-panel {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 4px var(--shadow);
+}
+
+.tools-panel summary,
+.master-panel summary {
+    font-weight: 600;
+    cursor: pointer;
+    list-style: none;
+}
+
+.tools-panel summary::-webkit-details-marker,
+.master-panel summary::-webkit-details-marker {
+    display: none;
+}
+
+.tools-content {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.tool-btn {
+    background: var(--accent);
+    border: none;
+    color: var(--text-primary);
+    padding: 12px;
+    border-radius: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.master-content {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.inspection-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 12px;
+}
+
+.inspection-title {
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.inspection-meta {
+    font-size: 0.8rem;
+    opacity: 0.7;
+    margin-bottom: 6px;
+}
+
+.inspection-items {
+    font-size: 0.9rem;
+    white-space: pre-wrap;
+}
+
 /* Шапка */
 .header {
     background-color: var(--header-bg);
