@@ -66,13 +66,13 @@
                 <button class="tool-btn" onclick="toggleTheme()" id="themeToggleSmall">
                     🌙 Сменить тему
                 </button>
+                <div class="tool-section">
+                    <button class="tool-btn" onclick="unlockInspections()">
+                        🔐 Показать проверки мастера
+                    </button>
+                    <div class="master-content hidden" id="inspectionsList"></div>
+                </div>
             </div>
-        </details>
-
-        <!-- Панель мастера -->
-        <details class="master-panel" id="masterPanel" open>
-            <summary>Панель мастера</summary>
-            <div class="master-content" id="inspectionsList"></div>
         </details>
 
         <!-- Список пунктов -->

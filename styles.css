@@ -165,8 +165,7 @@ body {
 }
 
 /* Панели */
-.tools-panel,
-.master-panel {
+.tools-panel {
     background: var(--card-bg);
     border: 1px solid var(--border);
     border-radius: 18px;
@@ -175,15 +174,13 @@ body {
     box-shadow: 0 2px 4px var(--shadow);
 }
 
-.tools-panel summary,
-.master-panel summary {
+.tools-panel summary {
     font-weight: 600;
     cursor: pointer;
     list-style: none;
 }
 
-.tools-panel summary::-webkit-details-marker,
-.master-panel summary::-webkit-details-marker {
+.tools-panel summary::-webkit-details-marker {
     display: none;
 }
 
@@ -192,6 +189,12 @@ body {
     flex-direction: column;
     gap: 10px;
     margin-top: 10px;
+}
+
+.tool-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
 
 .tool-btn {
@@ -209,6 +212,10 @@ body {
     flex-direction: column;
     gap: 10px;
     margin-top: 10px;
+}
+
+.hidden {
+    display: none;
 }
 
 .inspection-card {
