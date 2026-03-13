@@ -241,6 +241,8 @@ async function restoreFromBackupFlow() {
             hideSyncIndicator();
             alert('Справки восстановлены из файла бэкапа!');
         }, 1000);
+
+        closeToolsPanel();
     }
 }
 
@@ -516,6 +518,7 @@ function toggleTheme() {
     }
 
     localStorage.setItem('theme', currentTheme);
+    closeToolsPanel();
 }
 
 // Загрузка темы
@@ -699,11 +702,38 @@ async function unlockInspections() {
     if (container) {
         container.classList.remove('hidden');
     }
+
+    closeToolsPanel();
 }
 
 // Очистка интервала
 window.addEventListener('beforeunload', () => {
     if (syncInterval) {
         clearInterval(syncInterval);
+    }
+});
+
+// Управление выезжающей панелью инструментов
+function toggleToolsPanel() {
+    const panel = document.getElementById('toolsPanel');
+    const overlay = document.getElementById('toolsOverlay');
+    panel.classList.toggle('active');
+    overlay.classList.toggle('active');
+}
+
+function closeToolsPanel() {
+    const panel = document.getElementById('toolsPanel');
+    const overlay = document.getElementById('toolsOverlay');
+    panel.classList.remove('active');
+    overlay.classList.remove('active');
+}
+
+// Закрытие панели по Escape
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        const panel = document.getElementById('toolsPanel');
+        if (panel && panel.classList.contains('active')) {
+            closeToolsPanel();
+        }
     }
 });

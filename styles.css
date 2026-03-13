@@ -166,30 +166,100 @@ body {
     opacity: 0.7;
 }
 
-/* Панели */
-.tools-panel {
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 18px;
-    padding: 10px 12px;
-    margin-bottom: 12px;
-    box-shadow: 0 2px 4px var(--shadow);
+/* Панель инструментов - выезжающее окно */
+.tools-toggle-btn {
     position: fixed;
     top: 8px;
     right: 12px;
-    width: 280px;
-    max-width: calc(100vw - 24px);
-    z-index: 120;
-}
-
-.tools-panel summary {
-    font-weight: 600;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: none;
+    color: var(--accent-text);
+    font-size: 1.4rem;
     cursor: pointer;
-    list-style: none;
+    z-index: 110;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px var(--shadow);
+    transition: transform 0.2s;
 }
 
-.tools-panel summary::-webkit-details-marker {
-    display: none;
+.tools-toggle-btn:active {
+    transform: scale(0.92);
+}
+
+.tools-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 200;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s, visibility 0.3s;
+}
+
+.tools-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.tools-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 300px;
+    max-width: 85vw;
+    height: 100vh;
+    background: var(--card-bg);
+    box-shadow: -4px 0 20px var(--shadow);
+    z-index: 210;
+    transform: translateX(100%);
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.tools-panel.active {
+    transform: translateX(0);
+}
+
+.tools-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+    font-size: 1.1rem;
+    background: var(--header-bg);
+    color: var(--header-text);
+    border-radius: 0;
+}
+
+.tools-close-btn {
+    background: none;
+    border: none;
+    color: var(--header-text);
+    font-size: 1.3rem;
+    cursor: pointer;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background 0.2s;
+}
+
+.tools-close-btn:active {
+    background: rgba(255, 255, 255, 0.15);
 }
 
 .tools-content {

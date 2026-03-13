@@ -56,9 +56,18 @@
             <span id="syncStatus">🔄 Синхронизация...</span>
         </div>
 
-        <!-- Панель инструментов -->
-        <details class="tools-panel" id="toolsPanel">
-            <summary>Панель инструментов</summary>
+        <!-- Кнопка открытия панели инструментов -->
+        <button class="tools-toggle-btn" id="toolsToggleBtn" onclick="toggleToolsPanel()">
+            ⚙️
+        </button>
+
+        <!-- Выезжающая панель инструментов -->
+        <div class="tools-overlay" id="toolsOverlay" onclick="closeToolsPanel()"></div>
+        <div class="tools-panel" id="toolsPanel">
+            <div class="tools-panel-header">
+                <span>Панель инструментов</span>
+                <button class="tools-close-btn" onclick="closeToolsPanel()">✕</button>
+            </div>
             <div class="tools-content">
                 <button class="tool-btn" onclick="restoreFromBackupFlow()">
                     🔄 Восстановить из бэкапа
@@ -73,7 +82,7 @@
                     <div class="master-content hidden" id="inspectionsList"></div>
                 </div>
             </div>
-        </details>
+        </div>
 
         <!-- Список пунктов -->
         <div class="items-list" id="itemsList"></div>
