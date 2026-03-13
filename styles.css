@@ -191,6 +191,12 @@ body {
     transform: scale(0.92);
 }
 
+/* Скрываем кнопку когда панель открыта */
+.tools-overlay.active ~ .tools-toggle-btn,
+.tools-panel.active ~ .tools-toggle-btn {
+    display: none;
+}
+
 .tools-overlay {
     position: fixed;
     top: 0;
@@ -198,7 +204,6 @@ body {
     right: 0;
     bottom: 0;
     background: rgba(0, 0, 0, 0.4);
-    z-index: 205;
     z-index: 220;
     opacity: 0;
     visibility: hidden;

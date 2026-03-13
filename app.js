@@ -726,15 +726,27 @@ window.addEventListener('beforeunload', () => {
 function toggleToolsPanel() {
     const panel = document.getElementById('toolsPanel');
     const overlay = document.getElementById('toolsOverlay');
+    const btn = document.getElementById('toolsToggleBtn');
+    const isActive = panel.classList.contains('active');
+    
     panel.classList.toggle('active');
     overlay.classList.toggle('active');
+    
+    // Скрываем/показываем кнопку
+    if (!isActive) {
+        btn.style.display = 'none';
+    } else {
+        btn.style.display = 'flex';
+    }
 }
 
 function closeToolsPanel() {
     const panel = document.getElementById('toolsPanel');
     const overlay = document.getElementById('toolsOverlay');
+    const btn = document.getElementById('toolsToggleBtn');
     panel.classList.remove('active');
     overlay.classList.remove('active');
+    btn.style.display = 'flex';
 }
 
 // Закрытие панели по Escape

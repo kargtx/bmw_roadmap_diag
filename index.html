@@ -56,13 +56,11 @@
             <span id="syncStatus">🔄 Синхронизация...</span>
         </div>
 
-        <!-- Кнопка открытия панели инструментов -->
+        <!-- Выезжающая панель инструментов -->
+        <div class="tools-overlay" id="toolsOverlay" onclick="toggleToolsPanel()"></div>
         <button class="tools-toggle-btn" id="toolsToggleBtn" onclick="toggleToolsPanel()">
             ⚙️
         </button>
-
-        <!-- Выезжающая панель инструментов -->
-        <div class="tools-overlay" id="toolsOverlay" onclick="toggleToolsPanel()"></div>
         <div class="tools-panel" id="toolsPanel">
             <div class="tools-panel-header">
                 <span>Панель инструментов</span>
