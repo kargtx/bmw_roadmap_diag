@@ -468,20 +468,29 @@ async function finishInspection() {
         return;
     }
 
-    const completedItems = items.filter(i => i.checked).map(i => ({ id: i.id, title: i.title }));
+    const completedItems = items.filter(i => i.checked).map(i => ({ id: i.id, title: getDisplayTitle(i) }));
     const total = items.length;
     const completed = completedItems.length;
     const notCompleted = items.filter(i => !i.checked);
 
     let message = `✅ Выполнено: ${completed}/${total} (${Math.round(completed/total*100)}%)\n\n`;
 
-    if (notCompleted.length > 0) {
-        message += '❌ Не отмечены:\n';
-        notCompleted.forEach(item => {
-            message += `• ${item.title}\n`;
+    if (completedItems.length > 0) {
+        message += '✅ Выполненные проверки:\n';
+        completedItems.forEach((item, idx) => {
+            message += `${idx + 1}. ${item.title}\n`;
         });
-    } else {
-        message += '🎉 Все пункты отмечены! Проверка завершена.';
+    }
+
+    if (notCompleted.length > 0) {
+        message += '\n❌ Не отмечены:\n';
+        notCompleted.forEach((item, idx) => {
+            message += `${idx + 1}. ${getDisplayTitle(item)}\n`;
+        });
+    }
+
+    if (completed === total) {
+        message += '\n🎉 Все пункты отмечены! Проверка завершена.';
     }
 
     alert(message);
