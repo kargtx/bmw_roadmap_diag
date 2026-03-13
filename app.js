@@ -242,7 +242,6 @@ async function restoreFromBackupFlow() {
             alert('Справки восстановлены из файла бэкапа!');
         }, 1000);
 
-        closeToolsPanel();
     }
 }
 
@@ -370,7 +369,7 @@ async function editCurrentHelp() {
 
     const displayTitle = getDisplayTitle(item);
     document.getElementById('editModalTitle').textContent = `Редактирование: ${displayTitle}`;
-    document.getElementById('editTitle').value = item.title && !isPlaceholderTitle(item.title) ? item.title : displayTitle;
+    document.getElementById('editTitle').value = normalizeTitle(item.title) || displayTitle;
     document.getElementById('editHelp').value = item.help || '';
     document.getElementById('editModal').classList.add('active');
 
@@ -471,25 +470,19 @@ async function finishInspection() {
     const completedItems = items.filter(i => i.checked).map(i => ({ id: i.id, title: getDisplayTitle(i) }));
     const total = items.length;
     const completed = completedItems.length;
-    const notCompleted = items.filter(i => !i.checked);
+    const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-    let message = `✅ Выполнено: ${completed}/${total} (${Math.round(completed/total*100)}%)\n\n`;
-
+    let message = `✅ Выполнено: ${completed}/${total} (${percent}%)\n\n`;
+    message += '✅ Выполненные проверки:\n';
     if (completedItems.length > 0) {
-        message += '✅ Выполненные проверки:\n';
         completedItems.forEach((item, idx) => {
             message += `${idx + 1}. ${item.title}\n`;
         });
+    } else {
+        message += '— Нет выполненных проверок\n';
     }
 
-    if (notCompleted.length > 0) {
-        message += '\n❌ Не отмечены:\n';
-        notCompleted.forEach((item, idx) => {
-            message += `${idx + 1}. ${getDisplayTitle(item)}\n`;
-        });
-    }
-
-    if (completed === total) {
+    if (completed === total && total > 0) {
         message += '\n🎉 Все пункты отмечены! Проверка завершена.';
     }
 
@@ -527,7 +520,6 @@ function toggleTheme() {
     }
 
     localStorage.setItem('theme', currentTheme);
-    closeToolsPanel();
 }
 
 // Загрузка темы
@@ -596,23 +588,26 @@ function loadVehicleInfo() {
     }
 }
 
+function normalizeTitle(rawTitle) {
+    if (!rawTitle) return '';
+    return rawTitle
+        .replace(/^Пункт\\s*\\d+\\s*[:\\-–—]?\\s*/i, '')
+        .trim();
+}
+
 function getDisplayTitle(item) {
     if (!item) return 'Без названия';
-    if (item.title && !isPlaceholderTitle(item.title)) return item.title;
+    const normalizedTitle = normalizeTitle(item.title);
+    if (normalizedTitle) return normalizedTitle;
     const derived = deriveTitleFromHelp(item.help, item.id);
     return derived || (item.title || `Пункт ${item.id}`);
 }
 
-function isPlaceholderTitle(title) {
-    if (!title) return true;
-    return /^Пункт\\s*\\d+/i.test(title.trim());
-}
-
 function deriveTitleFromHelp(helpText, id) {
-    if (!helpText) return `Пункт ${id}`;
+    if (!helpText) return '';
     const firstLine = helpText.split('\\n')[0].trim();
-    if (!firstLine) return `Пункт ${id}`;
-    const cleaned = firstLine.replace(/^Пункт\\s*\\d+\\s*[:\\-]?\\s*/i, '').trim();
+    if (!firstLine) return '';
+    const cleaned = normalizeTitle(firstLine);
     return cleaned || firstLine;
 }
 
@@ -712,7 +707,6 @@ async function unlockInspections() {
         container.classList.remove('hidden');
     }
 
-    closeToolsPanel();
 }
 
 // Очистка интервала
@@ -748,13 +742,3 @@ function closeToolsPanel() {
     overlay.classList.remove('active');
     btn.style.display = 'flex';
 }
-
-// Закрытие панели по Escape
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-        const panel = document.getElementById('toolsPanel');
-        if (panel && panel.classList.contains('active')) {
-            closeToolsPanel();
-        }
-    }
-});
