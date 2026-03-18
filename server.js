@@ -191,6 +191,14 @@ const server = http.createServer(async (req, res) => {
                 return sendJson(res, 200, { ok: true });
             }
         }
+        if (pathname === '/api/inspections/clear' && req.method === 'POST') {
+            const body = await parseBody(req);
+            if (!body || body.password !== EDIT_PASSWORD) {
+                return sendJson(res, 403, { error: 'Неверный пароль' });
+            }
+            writeJson(INSPECTIONS_FILE, []);
+            return sendJson(res, 200, { ok: true });
+        }
 
         return sendJson(res, 404, { error: 'Не найдено' });
     }
@@ -201,3 +209,6 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
 });
+
+
+

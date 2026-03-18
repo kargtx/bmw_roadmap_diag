@@ -709,6 +709,43 @@ async function unlockInspections() {
 
 }
 
+// Очистить историю проверок
+async function clearInspectionsHistory() {
+    const password = await requireEditPassword();
+    if (!password) return;
+
+    if (!confirm('Очистить историю проверок мастера? Действие нельзя отменить.')) {
+        return;
+    }
+
+    showSyncIndicator('🗑️ Очистка истории...');
+
+    try {
+        const response = await fetch(`${API_BASE}/api/inspections/clear`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password })
+        });
+
+        if (!response.ok) {
+            const result = await response.json().catch(() => ({}));
+            const message = result.error || `Ошибка очистки (код ${response.status})`;
+            throw new Error(message);
+        }
+
+        renderInspections([]);
+        const container = document.getElementById('inspectionsList');
+        if (container && inspectionsUnlocked) {
+            container.classList.remove('hidden');
+        }
+
+        showSyncIndicator('🗑️ История проверок очищена');
+        setTimeout(() => hideSyncIndicator(), 1500);
+    } catch (error) {
+        hideSyncIndicator();
+        alert(error.message || 'Ошибка очистки истории');
+    }
+}
 // Очистка интервала
 window.addEventListener('beforeunload', () => {
     if (syncInterval) {
@@ -742,3 +779,7 @@ function closeToolsPanel() {
     overlay.classList.remove('active');
     btn.style.display = 'flex';
 }
+
+
+
+
