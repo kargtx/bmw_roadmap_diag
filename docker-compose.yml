@@ -1,0 +1,19 @@
+services:
+  app:
+    build: .
+    container_name: bmw_roadmap_diag_app
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+
+  autodeploy:
+    image: alpine:3.20
+    container_name: bmw_roadmap_diag_autodeploy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./:/repo
+    working_dir: /repo
+    command: ["sh", "/repo/scripts/autodeploy.sh"]
+    restart: unless-stopped
